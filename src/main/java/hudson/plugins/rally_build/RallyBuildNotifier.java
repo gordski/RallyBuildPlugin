@@ -3,9 +3,7 @@ package hudson.plugins.rally_build;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.rallydev.rest.RallyRestApi;
-import com.rallydev.rest.client.HttpClient;
 import com.rallydev.rest.request.CreateRequest;
-import com.rallydev.rest.request.GetRequest;
 import com.rallydev.rest.request.QueryRequest;
 import com.rallydev.rest.response.CreateResponse;
 import com.rallydev.rest.response.QueryResponse;
@@ -17,23 +15,20 @@ import hudson.model.AbstractBuild;
 import hudson.model.BuildListener;
 import hudson.model.FreeStyleProject;
 import hudson.model.Result;
+import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Notifier;
 import hudson.tasks.Publisher;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.TimeZone;
 import java.util.logging.Level;
@@ -227,5 +222,5 @@ public class RallyBuildNotifier extends Notifier {
     }
   }
 
-  private final Logger logger;
+  private transient final Logger logger;
 }

@@ -1,0 +1,31 @@
+apply plugin: "groovy"
+apply plugin: "idea"
+
+buildscript {
+  repositories {
+    jcenter()
+    maven {
+      url 'http://repo.jenkins-ci.org/releases/'
+    }
+  }
+  dependencies {
+    classpath 'org.jenkins-ci.tools:gradle-jpi-plugin:0.12.1'
+  }
+}
+
+apply plugin: 'org.jenkins-ci.jpi'
+
+dependencies {
+  compile "com.rallydev.rest:rally-rest-api:2.1.1"
+}
+
+
+group = "hudson.plugins.rally_build"
+version = "0.0.1-SNAPSHOT"    // Or whatever your version is.
+description = "Publish build information in Rally."
+
+jenkinsPlugin {
+  coreVersion = '1.594'                                               // Version of Jenkins core this plugin depends on.
+  displayName = 'Pulish build information in Rally.'                // Human-readable name of plugin.
+  shortName = 'rally_build'                                           // Plugin ID, defaults to the project name without trailing '-plugin'.
+}

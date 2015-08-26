@@ -236,9 +236,23 @@ public class RallyBuildNotifier extends Notifier {
       SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
       formatter.setTimeZone(zone);
 
+      //
+      // Expand variables in build number.
+      //
+
+      String expandedBuildNumber = buildNumber;
+
+      for (String var : build.getBuildVariables().keySet()) {
+
+        String replacement = build.getBuildVariables().get(var);
+
+        expandedBuildNumber = expandedBuildNumber.replace("${" + var + "}", replacement);
+        expandedBuildNumber = expandedBuildNumber.replace("$" + var, replacement);
+      }
+
       JsonObject newBuild = new JsonObject();
 
-      newBuild.add("Number", new JsonPrimitive(buildNumber));
+      newBuild.add("Number", new JsonPrimitive(expandedBuildNumber));
       newBuild.add("Status", buildStatus);
       newBuild.add("Uri", new JsonPrimitive(Jenkins.getActiveInstance().getRootUrl() + build.getUrl()));
       newBuild.add("Start", new JsonPrimitive(formatter.format(build.getTime())));

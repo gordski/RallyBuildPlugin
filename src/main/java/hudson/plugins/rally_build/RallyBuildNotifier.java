@@ -1,5 +1,6 @@
 package hudson.plugins.rally_build;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.rallydev.rest.RallyRestApi;
@@ -30,6 +31,9 @@ import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -181,6 +185,23 @@ public class RallyBuildNotifier extends Notifier {
 
       JsonPrimitive buildDefinition = rsp.getResults().get(0).getAsJsonObject().get("_ref").getAsJsonPrimitive();
 
+      req = new QueryRequest("changeset");
+      req.setFetch(new Fetch());
+      req.setLimit(1);
+
+      JsonArray changeSets = new JsonArray();
+
+      for(ChangeLogSet<? extends ChangeLogSet.Entry> set : build.getChangeSets()){
+        for(ChangeLogSet.Entry change : set){
+          req.setQueryFilter(new QueryFilter("Revision", "=", change.getCommitId()));
+          rsp = api.query(req);
+
+          if(rsp.wasSuccessful() && rsp.getTotalResultCount() > 0){
+            changeSets.add(rsp.getResults().get(0).getAsJsonObject());
+          }
+        }
+      }
+
       //
       // Create the new build.
       //
@@ -209,6 +230,10 @@ public class RallyBuildNotifier extends Notifier {
       newBuild.add("Start", new JsonPrimitive(formatter.format(build.getTime())));
       newBuild.add("Duration", new JsonPrimitive(build.getDuration()/1000.0));
       newBuild.add("BuildDefinition", buildDefinition);
+
+      if(changeSets.size() > 0) {
+        newBuild.add("Changesets", changeSets);
+      }
 
       CreateRequest createReq = new CreateRequest("build", newBuild);
       CreateResponse createRsp = api.create(createReq);

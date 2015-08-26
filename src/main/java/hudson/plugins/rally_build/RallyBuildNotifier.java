@@ -12,10 +12,7 @@ import com.rallydev.rest.util.Fetch;
 import com.rallydev.rest.util.QueryFilter;
 import hudson.Extension;
 import hudson.Launcher;
-import hudson.model.AbstractBuild;
-import hudson.model.BuildListener;
-import hudson.model.FreeStyleProject;
-import hudson.model.Result;
+import hudson.model.*;
 import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
@@ -31,10 +28,7 @@ import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -147,7 +141,6 @@ public class RallyBuildNotifier extends Notifier {
 
       api.setApplicationName("RallyBuildNotifer");
 
-
       //
       // Get the project.
       //
@@ -164,26 +157,47 @@ public class RallyBuildNotifier extends Notifier {
         return false;
       }
 
-      String project_id = rsp.getResults().get(0).getAsJsonObject().get("ObjectID").getAsString();
+      JsonObject projectObj = rsp.getResults().get(0).getAsJsonObject();
+
+      JsonPrimitive projectRef = projectObj.get("_ref").getAsJsonPrimitive();
+
+      String projectId = projectObj.get("ObjectID").getAsString();
 
 
       //
       // Get the build definition to add this build to.
       //
 
-      req = new QueryRequest("project/" + project_id + "/BuildDefinitions");
+      req = new QueryRequest("project/" + projectId + "/BuildDefinitions");
       req.setQueryFilter(new QueryFilter("Name", "=", buildName));
       req.setFetch(new Fetch());
       req.setLimit(1);
 
       rsp = api.query(req);
 
-      if (!rsp.wasSuccessful() || rsp.getTotalResultCount() < 1) {
+      if (!rsp.wasSuccessful()) {
         logger.warning("Failed to get Rally Build Definition: " + buildName);
         return false;
       }
 
-      JsonPrimitive buildDefinition = rsp.getResults().get(0).getAsJsonObject().get("_ref").getAsJsonPrimitive();
+      JsonPrimitive buildDefinition;
+
+      if(rsp.getTotalResultCount() < 1) {
+        JsonObject newDefinition = new JsonObject();
+        newDefinition.add("Name", new JsonPrimitive(buildName));
+        newDefinition.add("Project", projectRef);
+        CreateRequest createRequest = new CreateRequest("builddefinition", newDefinition);
+        CreateResponse createResponse = api.create(createRequest);
+
+        buildDefinition = createResponse.getObject().get("_ref").getAsJsonPrimitive();
+
+        if(!createResponse.wasSuccessful()) {
+          logger.warning("Failed to create Rally Build Definition: " + buildName);
+          return false;
+        }
+      } else {
+        buildDefinition = rsp.getResults().get(0).getAsJsonObject().get("_ref").getAsJsonPrimitive();
+      }
 
       req = new QueryRequest("changeset");
       req.setFetch(new Fetch());

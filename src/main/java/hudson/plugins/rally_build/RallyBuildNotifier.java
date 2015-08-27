@@ -240,15 +240,7 @@ public class RallyBuildNotifier extends Notifier {
       // Expand variables in build number.
       //
 
-      String expandedBuildNumber = buildNumber;
-
-      for (String var : build.getBuildVariables().keySet()) {
-
-        String replacement = build.getBuildVariables().get(var);
-
-        expandedBuildNumber = expandedBuildNumber.replace("${" + var + "}", replacement);
-        expandedBuildNumber = expandedBuildNumber.replace("$" + var, replacement);
-      }
+      String expandedBuildNumber = build.getEnvironment(listener).expand(buildNumber);
 
       JsonObject newBuild = new JsonObject();
 

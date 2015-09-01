@@ -1,10 +1,16 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
     <f:section title="Rally Build">
-        <f:entry title="Rally API Key" >
+        <f:entry title="API Key" >
             <f:textbox name="rally_api_key" value="${it.apiKey}" />
         </f:entry>
-        <f:entry title="Rally URL" >
+        <f:entry title="URL" >
             <f:textbox name="rally_url" value="${it.url}" />
+        </f:entry>
+        <f:entry title="Workspace Ref">
+            <f:textbox name="rally_workspace_ref" value="${it.workspaceRef}" />
+        </f:entry>
+        <f:entry title="Base Link URL">
+            <f:textbox name="rally_artifact_base_url" value="${it.artifactBaseUrl}" />
         </f:entry>
     </f:section>
 </j:jelly>

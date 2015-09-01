@@ -1,6 +1,7 @@
 package hudson.plugins.rally_build;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.rallydev.rest.RallyRestApi;
@@ -41,6 +42,8 @@ public class RallyBuildNotifier extends Notifier {
 
     private String apiKey;
     private String url;
+    private String workspaceRef;
+    private String artifactBaseUrl;
 
     public String getApiKey() {
       return apiKey;
@@ -58,10 +61,29 @@ public class RallyBuildNotifier extends Notifier {
       this.url = url;
     }
 
+    public String getWorkspaceRef() {
+      return workspaceRef;
+    }
+
+    public void setWorkspaceRef(String workspaceRef) {
+      this.workspaceRef = workspaceRef;
+    }
+
+    public String getArtifactBaseUrl() {
+      return artifactBaseUrl;
+    }
+
+    public void setArtifactBaseUrl(String artifactBaseUrl) {
+      this.artifactBaseUrl = artifactBaseUrl;
+    }
+
     @Override
     public boolean configure(StaplerRequest req, JSONObject formData) {
       apiKey = formData.getString("rally_api_key");
       url = formData.getString("rally_url");
+      artifactBaseUrl = formData.getString("rally_artifact_base_url");
+      workspaceRef = formData.getString("rally_workspace_ref");
+
       save();
       return true;
     }
@@ -125,10 +147,26 @@ public class RallyBuildNotifier extends Notifier {
     return BuildStepMonitor.NONE;
   }
 
+
+
   @Override
   public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
 
+    /*
+    RallyBuildData data = new RallyBuildData();
+    try {
+      data.addAtrifact(new RallyArtifact(RallyArtifact.Type.DEFECT, "DE1234", "Super bad defect!", new URI("https://www.google.co.uk")));
+    } catch (URISyntaxException e) {
+      e.printStackTrace();
+    }
+
+    build.addAction(data);
+
+    */
+
     URI rally_uri;
+
+    RallyBuildData data = new RallyBuildData();
 
     try {
       rally_uri = new URI(getDescriptor().getUrl());
@@ -145,12 +183,13 @@ public class RallyBuildNotifier extends Notifier {
       // Get the project.
       //
 
-      QueryRequest req = new QueryRequest("project");
-      req.setQueryFilter(new QueryFilter("Name", "=", project));
-      req.setFetch(new Fetch("ObjectID"));
-      req.setLimit(1);
+      QueryRequest projectReq = new QueryRequest("project");
+      projectReq.setQueryFilter(new QueryFilter("Name", "=", project));
+      projectReq.setWorkspace(getDescriptor().getWorkspaceRef());
+      projectReq.setFetch(new Fetch());
+      projectReq.setLimit(1);
 
-      QueryResponse rsp = api.query(req);
+      QueryResponse rsp = api.query(projectReq);
 
       if (!rsp.wasSuccessful() || rsp.getTotalResultCount() < 1) {
         logger.warning("Failed to get Rally Project: " + project);
@@ -168,12 +207,13 @@ public class RallyBuildNotifier extends Notifier {
       // Get the build definition to add this build to.
       //
 
-      req = new QueryRequest("project/" + projectId + "/BuildDefinitions");
-      req.setQueryFilter(new QueryFilter("Name", "=", buildName));
-      req.setFetch(new Fetch());
-      req.setLimit(1);
+      QueryRequest buildDefReq = new QueryRequest(projectObj.getAsJsonObject("BuildDefinitions"));
+      buildDefReq.setQueryFilter(new QueryFilter("Name", "=", buildName));
+      buildDefReq.setWorkspace(getDescriptor().getWorkspaceRef());
+      buildDefReq.setFetch(new Fetch());
+      buildDefReq.setLimit(1);
 
-      rsp = api.query(req);
+      rsp = api.query(buildDefReq);
 
       if (!rsp.wasSuccessful()) {
         logger.warning("Failed to get Rally Build Definition: " + buildName);
@@ -199,19 +239,70 @@ public class RallyBuildNotifier extends Notifier {
         buildDefinition = rsp.getResults().get(0).getAsJsonObject().get("_ref").getAsJsonPrimitive();
       }
 
-      req = new QueryRequest("changeset");
-      req.setFetch(new Fetch());
-      req.setLimit(1);
+      QueryRequest chengeSetReq = new QueryRequest("changeset");
+      chengeSetReq.setWorkspace(getDescriptor().getWorkspaceRef());
+      chengeSetReq.setFetch(new Fetch());
+      chengeSetReq.setLimit(1);
 
       JsonArray changeSets = new JsonArray();
 
+      String artifactBaseUrl = getDescriptor().getArtifactBaseUrl();
+      if(artifactBaseUrl.endsWith("/")) artifactBaseUrl = artifactBaseUrl.substring(0, artifactBaseUrl.length() - 1);
+
       for(ChangeLogSet<? extends ChangeLogSet.Entry> set : build.getChangeSets()){
         for(ChangeLogSet.Entry change : set){
-          req.setQueryFilter(new QueryFilter("Revision", "=", change.getCommitId()));
-          rsp = api.query(req);
+          chengeSetReq.setQueryFilter(new QueryFilter("Revision", "=", change.getCommitId()));
+          rsp = api.query(chengeSetReq);
 
           if(rsp.wasSuccessful() && rsp.getTotalResultCount() > 0){
-            changeSets.add(rsp.getResults().get(0).getAsJsonObject());
+            JsonObject changeSet = rsp.getResults().get(0).getAsJsonObject();
+            changeSets.add(changeSet);
+
+            if(changeSet.getAsJsonObject("Artifacts").get("Count").getAsInt() > 0) {
+              JsonObject artifactsCollection = changeSet.getAsJsonObject("Artifacts");
+
+              QueryRequest artifactReq = new QueryRequest(artifactsCollection);
+              artifactReq.setWorkspace(getDescriptor().getWorkspaceRef());
+              artifactReq.setFetch(new Fetch());
+              rsp = api.query(artifactReq);
+
+              if(rsp.wasSuccessful() && rsp.getTotalResultCount() > 0) {
+                for(JsonElement listElm : rsp.getResults()) {
+                  JsonObject artifact = listElm.getAsJsonObject();
+
+                  if(artifact != null) {
+                    String objectId = artifact.get("ObjectID").getAsString();
+
+                    RallyArtifact artifactData = null;
+
+                    switch(artifact.get("_type").getAsString()) {
+                      case "Defect": {
+                        String url = artifactBaseUrl + "/detail/defect/" + objectId;
+
+                        artifactData = new RallyArtifact(RallyArtifact.Type.DEFECT,
+                                objectId,
+                                artifact.get("FormattedID").getAsString(),
+                                artifact.get("_refObjectName").getAsString(),
+                                url);
+                        break;
+                      }
+                      case "HierarchicalRequirement": {
+                        String url = artifactBaseUrl + "/detail/userstory/" + objectId;
+
+                        artifactData = new RallyArtifact(RallyArtifact.Type.USER_STORY,
+                                objectId,
+                                artifact.get("FormattedID").getAsString(),
+                                artifact.get("_refObjectName").getAsString(),
+                                url);
+
+                      }
+                    }
+
+                    if(artifactData != null) data.addAtrifact(artifactData);
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -263,8 +354,11 @@ public class RallyBuildNotifier extends Notifier {
         return false;
       }
 
+      build.addAction(data);
+
       return true;
     }
+
   }
 
   private transient final Logger logger;

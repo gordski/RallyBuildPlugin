@@ -1,0 +1,38 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler"
+         xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson"
+         xmlns:f="/lib/form" xmlns:i="jelly:fmt">
+    <t:summary icon="/plugin/rally_build/rally.png">
+
+        <b>Defects</b>
+        <j:choose>
+            <ul>
+                <j:when test="${it.defects.size() > 0}">
+                    <j:forEach var="artifact" items="${it.defects}" end="4">
+                        <li><a href="${artifact.link}">${artifact.formattedId}</a> - ${artifact.title}</li>
+                    </j:forEach>
+                    <j:if test="${it.defects.size() > 5}"><p>(<a href="${it.urlName}#defects">more</a>)</p></j:if>
+                </j:when>
+                <j:otherwise>
+                    <li>No defects.</li>
+                </j:otherwise>
+            </ul>
+        </j:choose>
+
+        <b>User Stories</b>
+        <j:choose>
+            <ul>
+                <j:when test="${it.userStories.size() > 0}">
+                    <j:forEach var="artifact" items="${it.userStories}" end="4">
+                        <li><a href="${artifact.link}">${artifact.formattedId}</a> - ${artifact.title}</li>
+                    </j:forEach>
+                    <j:if test="${it.userStories.size() > 5}"><p>(<a href="${it.urlName}#user_stories">more</a>)</p></j:if>
+                </j:when>
+                <j:otherwise>
+                    <li>No stories.</li>
+                </j:otherwise>
+            </ul>
+        </j:choose>
+
+    </t:summary>
+</j:jelly>

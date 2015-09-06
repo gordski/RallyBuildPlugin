@@ -43,7 +43,6 @@ public class RallyBuildNotifier extends Notifier {
     private String apiKey;
     private String url;
     private String workspaceRef;
-    private String artifactBaseUrl;
 
     public String getApiKey() {
       return apiKey;
@@ -69,19 +68,10 @@ public class RallyBuildNotifier extends Notifier {
       this.workspaceRef = workspaceRef;
     }
 
-    public String getArtifactBaseUrl() {
-      return artifactBaseUrl;
-    }
-
-    public void setArtifactBaseUrl(String artifactBaseUrl) {
-      this.artifactBaseUrl = artifactBaseUrl;
-    }
-
     @Override
     public boolean configure(StaplerRequest req, JSONObject formData) {
       apiKey = formData.getString("rally_api_key");
       url = formData.getString("rally_url");
-      artifactBaseUrl = formData.getString("rally_artifact_base_url");
       workspaceRef = formData.getString("rally_workspace_ref");
 
       save();
@@ -151,18 +141,6 @@ public class RallyBuildNotifier extends Notifier {
 
   @Override
   public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
-
-    /*
-    RallyBuildData data = new RallyBuildData();
-    try {
-      data.addAtrifact(new RallyArtifact(RallyArtifact.Type.DEFECT, "DE1234", "Super bad defect!", new URI("https://www.google.co.uk")));
-    } catch (URISyntaxException e) {
-      e.printStackTrace();
-    }
-
-    build.addAction(data);
-
-    */
 
     URI rally_uri;
 
@@ -246,8 +224,10 @@ public class RallyBuildNotifier extends Notifier {
 
       JsonArray changeSets = new JsonArray();
 
-      String artifactBaseUrl = getDescriptor().getArtifactBaseUrl();
-      if(artifactBaseUrl.endsWith("/")) artifactBaseUrl = artifactBaseUrl.substring(0, artifactBaseUrl.length() - 1);
+      String artifactBaseUrl = getDescriptor().getUrl();
+      if(!artifactBaseUrl.endsWith("/")) artifactBaseUrl = artifactBaseUrl + "/";
+      artifactBaseUrl = artifactBaseUrl + "#/" + projectId + "d/detail/";
+
 
       for(ChangeLogSet<? extends ChangeLogSet.Entry> set : build.getChangeSets()){
         for(ChangeLogSet.Entry change : set){
@@ -277,7 +257,7 @@ public class RallyBuildNotifier extends Notifier {
 
                     switch(artifact.get("_type").getAsString()) {
                       case "Defect": {
-                        String url = artifactBaseUrl + "/detail/defect/" + objectId;
+                        String url = artifactBaseUrl + "defect/" + objectId;
 
                         artifactData = new RallyArtifact(RallyArtifact.Type.DEFECT,
                                 objectId,
@@ -287,7 +267,7 @@ public class RallyBuildNotifier extends Notifier {
                         break;
                       }
                       case "HierarchicalRequirement": {
-                        String url = artifactBaseUrl + "/detail/userstory/" + objectId;
+                        String url = artifactBaseUrl + "userstory/" + objectId;
 
                         artifactData = new RallyArtifact(RallyArtifact.Type.USER_STORY,
                                 objectId,
